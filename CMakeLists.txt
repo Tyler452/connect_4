@@ -62,6 +62,7 @@ add_executable(demo Application.cpp
                           classes/Grid.cpp
                           classes/TicTacToe.cpp
                           classes/Checkers.cpp
+                          classes/Connect4.cpp
                           classes/Othello.cpp
                           ${BCKD_FILE}
                           ${MAIN_FILE}
