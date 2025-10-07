@@ -4,13 +4,6 @@
 #include <algorithm>
 #include <limits>
 
-// Constructor / Destructor
-#include "Connect4.h"
-
-#include <vector>
-#include <algorithm>
-#include <limits>
-
 Connect4::Connect4() : Game() {
     _grid = new Grid(CONNECT4_COLS, CONNECT4_ROWS);
 }
