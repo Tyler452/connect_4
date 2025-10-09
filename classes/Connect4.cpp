@@ -19,7 +19,7 @@ void Connect4::setUpBoard() {
 
     _grid->initializeSquares(80, "square.png");
 
-    if (gameHasAI()) {
+    if (_gameOptions.AIPlaying) {
         setAIPlayer(AI_PLAYER);
     }
 
@@ -110,36 +110,44 @@ int Connect4::countConsecutive(int x, int y, int dx, int dy, Player* owner) cons
 Player* Connect4::checkForWinner() {
     Player* winner = nullptr;
     const int dirs[4][2] = {{1,0},{0,1},{1,1},{1,-1}};
-
-    _grid->forEachEnabledSquare([&](ChessSquare* square, int x, int y) {
-        if (winner) return;
-        Bit* b = square->bit();
-        if (!b) return;
-        Player* owner = b->getOwner();
-        for (int i = 0; i < 4; ++i) {
-            int dx = dirs[i][0];
-            int dy = dirs[i][1];
-            int total = 1 + countConsecutive(x, y, dx, dy, owner) + countConsecutive(x, y, -dx, -dy, owner);
-            if (total >= 4) { winner = owner; return; }
+    for (int y = 0; y < CONNECT4_ROWS; ++y) {
+        for (int x = 0; x < CONNECT4_COLS; ++x) {
+            if (winner) break;
+            ChessSquare* square = _grid->getSquare(x, y);
+            if (!square) continue;
+            Bit* b = square->bit();
+            if (!b) continue;
+            Player* owner = b->getOwner();
+            for (int i = 0; i < 4; ++i) {
+                int dx = dirs[i][0];
+                int dy = dirs[i][1];
+                int total = 1 + countConsecutive(x, y, dx, dy, owner) + countConsecutive(x, y, -dx, -dy, owner);
+                if (total >= 4) { winner = owner; break; }
+            }
         }
-    });
-
+    }
     if (winner) _winner = winner;
     return winner;
 }
 
 bool Connect4::checkForDraw() {
-    bool full = true;
-    _grid->forEachEnabledSquare([&full](ChessSquare* square, int x, int y) {
-        if (!square->bit()) full = false;
-    });
-    return full && !checkForWinner();
+    for (int y = 0; y < CONNECT4_ROWS; ++y) {
+        for (int x = 0; x < CONNECT4_COLS; ++x) {
+            ChessSquare* sq = _grid->getSquare(x, y);
+            if (!sq) return false;
+            if (!sq->bit()) return false;
+        }
+    }
+    return !checkForWinner();
 }
 
 void Connect4::stopGame() {
-    _grid->forEachSquare([](ChessSquare* square, int x, int y) {
-        square->destroyBit();
-    });
+    for (int y = 0; y < CONNECT4_ROWS; ++y) {
+        for (int x = 0; x < CONNECT4_COLS; ++x) {
+            ChessSquare* sq = _grid->getSquare(x, y);
+            if (sq) sq->destroyBit();
+        }
+    }
 }
 
 std::string Connect4::initialStateString() {
@@ -149,20 +157,27 @@ std::string Connect4::initialStateString() {
 std::string Connect4::stateString() {
     std::string s;
     s.reserve(CONNECT4_COLS * CONNECT4_ROWS);
-    _grid->forEachEnabledSquare([&s,this](ChessSquare* square, int x, int y) {
-        Bit* bit = square->bit();
-        if (!bit) s += '0';
-        else s += (bit->gameTag() == RED_PIECE ? '1' : '2');
-    });
+    for (int y = 0; y < CONNECT4_ROWS; ++y) {
+        for (int x = 0; x < CONNECT4_COLS; ++x) {
+            ChessSquare* sq = _grid->getSquare(x, y);
+            if (!sq) { s += '0'; continue; }
+            Bit* b = sq->bit();
+            if (!b) s += '0';
+            else s += (b->gameTag() == RED_PIECE ? '1' : '2');
+        }
+    }
     return s;
 }
 
 void Connect4::setStateString(const std::string &s) {
     if ((int)s.length() != CONNECT4_COLS * CONNECT4_ROWS) return;
     int index = 0;
-    _grid->forEachEnabledSquare([&](ChessSquare* square, int x, int y) {
-        if (index < (int)s.length()) {
+    for (int y = 0; y < CONNECT4_ROWS; ++y) {
+        for (int x = 0; x < CONNECT4_COLS; ++x) {
+            if (index >= (int)s.length()) break;
             char c = s[index++];
+            ChessSquare* square = _grid->getSquare(x, y);
+            if (!square) continue;
             square->destroyBit();
             if (c == '1') {
                 Bit* piece = createPiece(RED_PIECE);
@@ -174,41 +189,118 @@ void Connect4::setStateString(const std::string &s) {
                 square->setBit(piece);
             }
         }
-    });
+    }
 }
-
+/*This Ai uses the windowed method that the professor mentioned in class. 
+Although it took a while by looking around to try and fully understand it how it would work.
+*/
 static bool isAIBoardFull(const std::string& state) {
     return state.find('0') == std::string::npos;
+}
+
+static int countDirection(const std::string &state, int rows, int cols, int r, int c, int dr, int dc, char player) {
+    int count = 0;
+    r += dr; c += dc;
+    while (r >= 0 && r < rows && c >= 0 && c < cols) {
+        int idx = r * cols + c;
+        if (state[idx] != player) break;
+        ++count;
+        r += dr; c += dc;
+    }
+    return count;
+}
+
+static bool isWinningMove(std::string state, int cols, int rows, int col, char player) {
+    int row = -1;
+    for (int r = rows - 1; r >= 0; --r) {
+        int idx = r * cols + col;
+        if (state[idx] == '0') { row = r; break; }
+    }
+    if (row < 0) return false;
+    int idx = row * cols + col;
+    state[idx] = player;
+    const int dirs[4][2] = {{1,0},{0,1},{1,1},{1,-1}};
+    for (int i = 0; i < 4; ++i) {
+        int dx = dirs[i][0];
+        int dy = dirs[i][1];
+        int total = 1 + countDirection(state, rows, cols, row, col, 0 + dy, 0 + dx, player) + countDirection(state, rows, cols, row, col, 0 - dy, 0 - dx, player);
+        if (total >= 4) return true;
+    }
+    return false;
 }
 
 static int evaluateAIBoard(const std::string& state) {
     const int rows = Connect4::CONNECT4_ROWS;
     const int cols = Connect4::CONNECT4_COLS;
-    std::vector<int> values(rows * cols, 1);
+    const int WIN_SCORE = 100000;
+    const int THREE_SCORE = 100;
+    const int TWO_SCORE = 10;
 
-    if (cols == 7 && rows == 6) {
-        const int vals[] = {
-            1,1,2,3,2,1,1,
-            1,1,2,3,2,1,1,
-            1,1,2,3,2,1,1,
-            1,1,2,3,2,1,1,
-            1,1,2,3,2,1,1,
-            1,1,2,3,2,1,1
-        };
-        values.assign(vals, vals + rows * cols);
-    } else {
-        int center = cols / 2;
-        for (int r = 0; r < rows; ++r)
-            for (int c = 0; c < cols; ++c)
-                values[r * cols + c] = std::max(1, center - abs(c - center) + 1);
+    int score = 0;
+    auto scoreWindow = [&](int a, int b, int c, int d) {
+        int ai = 0, hu = 0;
+        if (state[a] == '2') ++ai; else if (state[a] == '1') ++hu;
+        if (state[b] == '2') ++ai; else if (state[b] == '1') ++hu;
+        if (state[c] == '2') ++ai; else if (state[c] == '1') ++hu;
+        if (state[d] == '2') ++ai; else if (state[d] == '1') ++hu;
+        if (ai > 0 && hu > 0) return 0;
+        if (ai == 4) return WIN_SCORE;
+        if (hu == 4) return -WIN_SCORE;
+        if (ai == 3 && hu == 0) return THREE_SCORE;
+        if (ai == 2 && hu == 0) return TWO_SCORE;
+        if (hu == 3 && ai == 0) return -THREE_SCORE;
+        if (hu == 2 && ai == 0) return -TWO_SCORE;
+        return 0;
+    };
+
+    for (int r = 0; r < rows; ++r) {
+        for (int c = 0; c < cols - 3; ++c) {
+            int a = r * cols + c;
+            int b = r * cols + c + 1;
+            int c2 = r * cols + c + 2;
+            int d = r * cols + c + 3;
+            score += scoreWindow(a,b,c2,d);
+        }
     }
 
-    int value = 0;
-    for (int i = 0; i < (int)state.size(); ++i) {
-        if (state[i] == '2') value += values[i];
-        else if (state[i] == '1') value -= values[i];
+    for (int c = 0; c < cols; ++c) {
+        for (int r = 0; r < rows - 3; ++r) {
+            int a = r * cols + c;
+            int b = (r + 1) * cols + c;
+            int c2 = (r + 2) * cols + c;
+            int d = (r + 3) * cols + c;
+            score += scoreWindow(a,b,c2,d);
+        }
     }
-    return value;
+
+    for (int r = 0; r < rows - 3; ++r) {
+        for (int c = 0; c < cols - 3; ++c) {
+            int a = r * cols + c;
+            int b = (r + 1) * cols + c + 1;
+            int c2 = (r + 2) * cols + c + 2;
+            int d = (r + 3) * cols + c + 3;
+            score += scoreWindow(a,b,c2,d);
+        }
+    }
+
+    for (int r = 3; r < rows; ++r) {
+        for (int c = 0; c < cols - 3; ++c) {
+            int a = r * cols + c;
+            int b = (r - 1) * cols + c + 1;
+            int c2 = (r - 2) * cols + c + 2;
+            int d = (r - 3) * cols + c + 3;
+            score += scoreWindow(a,b,c2,d);
+        }
+    }
+
+    int centerCol = cols / 2;
+    for (int r = 0; r < rows; ++r) {
+        int idx = r * cols + centerCol;
+        if (state[idx] == '2') score += 3;
+        else if (state[idx] == '1') score -= 3;
+    }
+
+    return score;
 }
 
 int Connect4::negamax(std::string& state, int depth, int playerColor) {
@@ -222,19 +314,30 @@ int Connect4::negamax(std::string& state, int depth, int playerColor, int alpha,
         return evaluateAIBoard(state) * playerColor;
 
     int bestVal = -1000000;
-    static const int order[7] = {3, 2, 4, 1, 5, 0, 6};
+    const int rows = CONNECT4_ROWS;
+    const int cols = CONNECT4_COLS;
 
-    for (int i = 0; i < CONNECT4_COLS; ++i) {
-        int col = order[i];
-        if (col >= CONNECT4_COLS) continue;
+    std::vector<std::pair<int,int>> moves;
+    for (int col = 0; col < cols; ++col) {
         int row = aiLowestRow(state, col);
         if (row < 0) continue;
+        int idx = row * cols + col;
+        char playerChar = (playerColor == 1) ? '2' : '1';
+        state[idx] = playerChar;
+        int h = evaluateAIBoard(state) * playerColor;
+        state[idx] = '0';
+        moves.emplace_back(h, col);
+    }
 
-        int idx = row * CONNECT4_COLS + col;
+    std::sort(moves.begin(), moves.end(), [](const std::pair<int,int>& a, const std::pair<int,int>& b){ return a.first > b.first; });
+
+    for (auto &p : moves) {
+        int col = p.second;
+        int row = aiLowestRow(state, col);
+        if (row < 0) continue;
+        int idx = row * cols + col;
         state[idx] = (playerColor == 1) ? '2' : '1';
-
         int val = -negamax(state, depth + 1, -playerColor, -beta, -alpha);
-
         state[idx] = '0';
 
         if (val > bestVal) bestVal = val;
@@ -252,6 +355,24 @@ void Connect4::updateAI() {
     int bestVal = -1000000;
 
     static const int order[CONNECT4_COLS] = {3, 2, 4, 1, 5, 0, 6};
+    for (int i = 0; i < CONNECT4_COLS; ++i) {
+        int col = order[i];
+        if (aiLowestRow(state, col) < 0) continue;
+        if (isWinningMove(state, CONNECT4_COLS, CONNECT4_ROWS, col, '2')) {
+            BitHolder* top = _grid->getSquare(col, 0);
+            if (top) { actionForEmptyHolder(*top); return; }
+        }
+    }
+
+    for (int i = 0; i < CONNECT4_COLS; ++i) {
+        int col = order[i];
+        if (aiLowestRow(state, col) < 0) continue;
+        if (isWinningMove(state, CONNECT4_COLS, CONNECT4_ROWS, col, '1')) {
+            BitHolder* top = _grid->getSquare(col, 0);
+            if (top) { actionForEmptyHolder(*top); return; }
+        }
+    }
+
     for (int i = 0; i < CONNECT4_COLS; ++i) {
         int col = order[i];
         int row = aiLowestRow(state, col);

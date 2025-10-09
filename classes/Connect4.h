@@ -14,7 +14,6 @@ public:
     static const int CONNECT4_COLS = 7;
     static const int CONNECT4_ROWS = 6;
 
-    // Game interface
     void setUpBoard() override;
     Bit* createPiece(Player* player);
     bool actionForEmptyHolder(BitHolder &holder) override;
@@ -39,12 +38,10 @@ private:
     static const int RED_PIECE = 1;
     static const int YELLOW_PIECE = 2;
 
-    // Internal helpers
     Bit* createPiece(int pieceType);
     int countConsecutive(int x, int y, int dx, int dy, Player* owner) const;
     int getLowestEmptyRowForColumn(int x) const;
 
-    // AI helpers
     int aiLowestRow(const std::string& state, int col);
     int negamax(std::string& state, int depth, int playerColor);
     int negamax(std::string& state, int depth, int playerColor, int alpha, int beta);

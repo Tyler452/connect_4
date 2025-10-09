@@ -12,7 +12,6 @@ public:
     Grid(int width, int height);
     ~Grid();
 
-    // Basic access
     ChessSquare* getSquare(int x, int y);
     ChessSquare* getSquareByIndex(int index);
     bool isValid(int x, int y) const;
@@ -25,17 +24,15 @@ public:
     int getIndex(int x, int y) const { return y * _width + x; }
     void getCoordinates(int index, int& x, int& y) const;
 
-    // Directional helpers (built into Grid)
-    ChessSquare* getFL(int x, int y);  // front-left (up-left diagonal)
-    ChessSquare* getFR(int x, int y);  // front-right (up-right diagonal)
-    ChessSquare* getBL(int x, int y);  // back-left (down-left diagonal)
-    ChessSquare* getBR(int x, int y);  // back-right (down-right diagonal)
+    ChessSquare* getFL(int x, int y);
+    ChessSquare* getFR(int x, int y);
+    ChessSquare* getBL(int x, int y);
+    ChessSquare* getBR(int x, int y);
 
-    // Orthogonal directions
-    ChessSquare* getN(int x, int y);   // north (up)
-    ChessSquare* getS(int x, int y);   // south (down)
-    ChessSquare* getE(int x, int y);   // east (right)
-    ChessSquare* getW(int x, int y);   // west (left)
+    ChessSquare* getN(int x, int y);
+    ChessSquare* getS(int x, int y);
+    ChessSquare* getE(int x, int y);
+    ChessSquare* getW(int x, int y);
 
     // Double-distance helpers
     ChessSquare* getFLFL(int x, int y) { auto s = getFL(x, y); return s ? getFL(s->getColumn(), s->getRow()) : nullptr; }
@@ -49,15 +46,13 @@ public:
     std::vector<ChessSquare*> getConnectedSquares(int x, int y);
     bool areConnected(int fromX, int fromY, int toX, int toY);
 
-    // Iterator support
+
     void forEachSquare(std::function<void(ChessSquare*, int x, int y)> func);
     void forEachEnabledSquare(std::function<void(ChessSquare*, int x, int y)> func);
 
-    // Initialize squares with positions and sprites
     void initializeSquares(float squareSize, const char* spriteName);
     void initializeSquare(int x, int y, float squareSize, const char* spriteName);
 
-    // State management (for enabled squares only)
     std::string getStateString() const;
     void setStateString(const std::string& state);
 

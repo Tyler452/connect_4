@@ -57,8 +57,14 @@ namespace ClassGame {
                         game = new Othello();
                         game->setUpBoard();
                     }
-                    if (ImGui::Button("Start Connect 4")) {
+                    if (ImGui::Button("Start Connect 4 (2-player)")) {
                         game = new Connect4();
+                        game->_gameOptions.AIPlaying = false;
+                        game->setUpBoard();
+                    }
+                    if (ImGui::Button("Start Connect 4 (vs AI)")) {
+                        game = new Connect4();
+                        game->_gameOptions.AIPlaying = true;
                         game->setUpBoard();
                     }
                 } else {
