@@ -192,7 +192,8 @@ void Connect4::setStateString(const std::string &s) {
     }
 }
 /*This Ai uses the windowed method that the professor mentioned in class. 
-Although it took a while by looking around to try and fully understand it how it would work.
+Although it took a while by looking around to try and try to understand it how it would work.
+it also uses the alpha-beta method and should fully work.
 */
 static bool isAIBoardFull(const std::string& state) {
     return state.find('0') == std::string::npos;
